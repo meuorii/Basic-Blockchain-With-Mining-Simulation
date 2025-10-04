@@ -1,0 +1,46 @@
+# ========================
+# Global
+# ========================
+node_modules/
+dist/
+build/
+.env
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+# ========================
+# Backend (Express)
+# ========================
+backend/node_modules/
+backend/.env
+backend/coverage/
+backend/logs/
+backend/tmp/
+backend/package-lock.json
+
+# ========================
+# Frontend (React + Vite + Tailwind)
+# ========================
+frontend/node_modules/
+frontend/.env
+frontend/.env.local
+frontend/dist/
+frontend/build/
+frontend/.parcel-cache
+frontend/package-lock.json
+
+# ========================
+# IDE / OS
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+*.bak
+
