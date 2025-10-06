@@ -1,10 +1,9 @@
 import crypto from "crypto";
-
 class Block {
   constructor(index, timestamp, data, previousHash = "") {
     this.index = index;
     this.timestamp = timestamp;
-    this.data = data;
+    this.data = data; // includes miner/reward info
     this.previousHash = previousHash;
     this.nonce = 0;
     this.hash = this.calculateHash();
@@ -17,7 +16,7 @@ class Block {
         this.index +
           this.previousHash +
           this.timestamp +
-          JSON.stringify(this.data) +
+          JSON.stringify(this.data || "") +
           this.nonce
       )
       .digest("hex");
@@ -35,41 +34,82 @@ class Block {
 class Blockchain {
   constructor() {
     this.chain = [this.createGenesisBlock()];
-    this.difficulty = 4;
+    this.difficulty = 4; // initial mining difficulty
+    this.adjustmentInterval = 10; // blocks before difficulty increases
   }
 
   createGenesisBlock() {
-    return new Block(0, Date.now(), "Genesis Block", "0");
+    return new Block(
+      0,
+      new Date().toISOString(),
+      { message: "Genesis Block", miner: "system", reward: 0 },
+      "0"
+    );
   }
 
   getLatestBlock() {
     return this.chain[this.chain.length - 1];
   }
 
-  addBlock(newBlock) {
-    newBlock.previousHash = this.getLatestBlock().hash;
+
+  addBlock(data) {
+    const newBlock = new Block(
+      this.chain.length,
+      new Date().toISOString(),
+      data || { message: "Empty Block Data" },
+      this.getLatestBlock().hash
+    );
+
     newBlock.hash = newBlock.calculateHash();
     this.chain.push(newBlock);
+
+    // auto adjust difficulty occasionally
+    this.adjustDifficulty();
+
+    return newBlock;
   }
 
   minePendingBlock(data) {
     const newBlock = new Block(
       this.chain.length,
-      Date.now(),
-      data,
+      new Date().toISOString(),
+      data || { message: "Empty Block Data" },
       this.getLatestBlock().hash
     );
+
     newBlock.mineBlock(this.difficulty);
     this.chain.push(newBlock);
+
+    // auto adjust difficulty
+    this.adjustDifficulty();
+
     return newBlock;
+  }
+
+  adjustDifficulty() {
+    if (
+      this.chain.length % this.adjustmentInterval === 0 &&
+      this.chain.length > 0
+    ) {
+      this.difficulty++;
+      console.log(`⚙️ Difficulty increased to: ${this.difficulty}`);
+    }
   }
 
   isChainValid() {
     for (let i = 1; i < this.chain.length; i++) {
       const current = this.chain[i];
       const prev = this.chain[i - 1];
-      if (current.hash !== current.calculateHash()) return false;
-      if (current.previousHash !== prev.hash) return false;
+
+      if (current.hash !== current.calculateHash()) {
+        console.log(`❌ Invalid hash at block ${i}`);
+        return false;
+      }
+
+      if (current.previousHash !== prev.hash) {
+        console.log(`❌ Invalid link at block ${i}`);
+        return false;
+      }
     }
     return true;
   }

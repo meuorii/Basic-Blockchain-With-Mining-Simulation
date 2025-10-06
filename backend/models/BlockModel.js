@@ -3,10 +3,11 @@ import mongoose from "mongoose";
 const blockSchema = new mongoose.Schema({
   index: Number,
   timestamp: String,
-  data: Object,
+  data: mongoose.Schema.Types.Mixed,
   previousHash: String,
   hash: String,
   nonce: Number,
 });
 
-export default mongoose.model("Block", blockSchema);
+const BlockModel = mongoose.model("Block", blockSchema);
+export default BlockModel;
