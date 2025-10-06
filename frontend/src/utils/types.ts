@@ -1,8 +1,8 @@
 export interface BlockData {
-  message: string;
-  sender?: string;
-  receiver?: string;
-  amount?: number;
+  miner: string;      
+  reward: number;       
+  difficulty?: number;    
+  message?: string;       
 }
 
 export interface Block {
@@ -19,6 +19,6 @@ export interface BlockchainResponse {
 }
 
 export interface MiningResponse {
-  message: string;
+  message: string;   
   block: Block;
 }

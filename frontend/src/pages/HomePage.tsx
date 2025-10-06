@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getChain, addBlock, mineBlock, validateChain } from "../utils/api";
+import { getChain, mineBlock, validateChain } from "../utils/api";
 import type { Block } from "../utils/types";
 import BlockchainExplorer from "../components/BlockchainExplorer";
 import AddBlockForm from "../components/AddBlockForm";
@@ -11,12 +11,22 @@ const HomePage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [mining, setMining] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
+  const [minerName, setMinerName] = useState<string>("");
+  const [balance, setBalance] = useState<number>(0);
 
-  // ✅ Fetch blockchain on mount
+  // ✅ Fetch blockchain from backend
   const fetchChain = async () => {
     try {
       const res = await getChain();
       setChain(res.data.chain);
+
+      // 💰 Update wallet balance if minerName is known
+      if (minerName) {
+        const totalReward = res.data.chain
+          .filter((b: Block) => b.data?.miner === minerName)
+          .reduce((sum, b) => sum + (b.data?.reward || 0), 0);
+        setBalance(totalReward);
+      }
     } catch (error) {
       console.error("Error fetching chain:", error);
     } finally {
@@ -26,27 +36,21 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     fetchChain();
-  }, []);
+  }, [minerName]);
 
-  // ✅ Add block (without mining)
-  const handleAddBlock = async (data: string) => {
+  // ✅ Handle mining (simulate crypto mining)
+  const handleMineBlock = async (miner: string) => {
     try {
-      await addBlock(data);
-      fetchChain();
-      setMessage("✅ Block added successfully!");
-    } catch (error) {
-      console.error(error);
-      setMessage("❌ Failed to add block.");
-    }
-  };
-
-  // ✅ Mine block (with proof of work)
-  const handleMineBlock = async (data: string) => {
-    try {
+      if (!miner) {
+        setMessage("⚠️ Please enter your miner name before mining!");
+        return;
+      }
       setMining(true);
-      setMessage("⛏️ Mining in progress... Please wait.");
-      const res = await mineBlock(data);
-      setMessage(`🎉 ${res.data.message}`);
+      setMessage("⛏️ Mining in progress... please wait...");
+      setMinerName(miner);
+
+      const res = await mineBlock(miner);
+      setMessage(res.data.message);
       fetchChain();
     } catch (error) {
       console.error(error);
@@ -56,12 +60,15 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // ✅ Validate chain integrity
+  // ✅ Validate chain
   const handleValidate = async () => {
     try {
       const res = await validateChain();
-      const valid = res.data.valid;
-      setMessage(valid ? "✅ Blockchain is valid!" : "⚠️ Blockchain is invalid!");
+      setMessage(
+        res.data.valid
+          ? "✅ Blockchain is valid!"
+          : "⚠️ Blockchain integrity compromised!"
+      );
     } catch (error) {
       console.error(error);
       setMessage("❌ Validation error.");
@@ -69,28 +76,40 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <h1 className="text-3xl font-bold text-emerald-400 text-center">
-        🔗 Basic Blockchain System with Mining Simulation
+        💎 Basic Blockchain Mining Simulator
       </h1>
       <p className="text-center text-gray-400 max-w-2xl mx-auto">
-        Add data blocks, mine them using Proof of Work, and validate your blockchain’s integrity in real time.
+        Click “Start Mining” to earn GRIND tokens and build the blockchain.
       </p>
 
-      {/* 🧩 Add / Mine Block Form */}
-      <AddBlockForm onAdd={handleAddBlock} onMine={handleMineBlock} mining={mining} />
+      {/* 💰 Wallet Balance */}
+      {minerName && (
+        <div className="text-center bg-emerald-800/10 border border-emerald-500/20 py-3 px-6 rounded-lg w-fit mx-auto">
+          <p className="text-emerald-400 font-semibold">
+            🪙 Wallet ({minerName}):{" "}
+            <span className="text-white">{balance.toFixed(2)} GRIND</span>
+          </p>
+        </div>
+      )}
 
-      {/* ⛏️ Mining Status */}
+      {/* ⛏️ Start Mining Form */}
+      <AddBlockForm onMine={handleMineBlock} mining={mining} />
+
+      {/* 🧠 Mining Status */}
       {message && <MiningStatus message={message} />}
 
-      {/* 🧱 Blockchain Explorer */}
+      {/* 🔗 Blockchain Explorer */}
       {loading ? (
-        <p className="text-center text-gray-400 animate-pulse">Loading blockchain...</p>
+        <p className="text-center text-gray-400 animate-pulse">
+          Loading blockchain...
+        </p>
       ) : (
         <BlockchainExplorer chain={chain} />
       )}
 
-      {/* ✅ Validate Chain Button */}
+      {/* ✅ Validate Chain */}
       <div className="flex justify-center pt-4">
         <ValidateChainButton onValidate={handleValidate} />
       </div>
