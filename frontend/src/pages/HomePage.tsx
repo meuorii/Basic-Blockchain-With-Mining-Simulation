@@ -2,29 +2,29 @@ import React, { useEffect, useState } from "react";
 import { getChain, mineBlock, validateChain } from "../utils/api";
 import type { Block } from "../utils/types";
 import BlockchainExplorer from "../components/BlockchainExplorer";
-import AddBlockForm from "../components/AddBlockForm";
 import MiningStatus from "../components/MiningStatus";
 import ValidateChainButton from "../components/ValidateChainButton";
+import { useAuth } from "../context/AuthContext";
 
 const HomePage: React.FC = () => {
+  const { user } = useAuth(); // ✅ Get logged-in miner
   const [chain, setChain] = useState<Block[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [mining, setMining] = useState<boolean>(false);
-  const [message, setMessage] = useState<string>("");
-  const [minerName, setMinerName] = useState<string>("");
-  const [balance, setBalance] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [mining, setMining] = useState(false);
+  const [message, setMessage] = useState("");
+  const [balance, setBalance] = useState<number>(user?.balance || 0);
 
-  // ✅ Fetch blockchain from backend
+  // ✅ Fetch blockchain and update balance
   const fetchChain = async () => {
     try {
       const res = await getChain();
       setChain(res.data.chain);
 
-      // 💰 Update wallet balance if minerName is known
-      if (minerName) {
+      if (user) {
         const totalReward = res.data.chain
-          .filter((b: Block) => b.data?.miner === minerName)
+          .filter((b: Block) => b.data?.miner === user.username)
           .reduce((sum, b) => sum + (b.data?.reward || 0), 0);
+
         setBalance(totalReward);
       }
     } catch (error) {
@@ -36,21 +36,24 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     fetchChain();
-  }, [minerName]);
+  }, [user]);
 
-  // ✅ Handle mining (simulate crypto mining)
-  const handleMineBlock = async (miner: string) => {
+  // ✅ Mine new block (requires auth)
+  const handleMineBlock = async () => {
+    if (!user) {
+      setMessage("⚠️ Please log in to start mining!");
+      return;
+    }
+
     try {
-      if (!miner) {
-        setMessage("⚠️ Please enter your miner name before mining!");
-        return;
-      }
       setMining(true);
       setMessage("⛏️ Mining in progress... please wait...");
-      setMinerName(miner);
 
-      const res = await mineBlock(miner);
+      const res = await mineBlock(user.username);
       setMessage(res.data.message);
+
+      // Update balance locally
+      setBalance((prev) => prev + res.data.reward);
       fetchChain();
     } catch (error) {
       console.error(error);
@@ -60,7 +63,7 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // ✅ Validate chain
+  // ✅ Validate blockchain integrity
   const handleValidate = async () => {
     try {
       const res = await validateChain();
@@ -78,24 +81,42 @@ const HomePage: React.FC = () => {
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold text-emerald-400 text-center">
-        💎 Basic Blockchain Mining Simulator
+        💎 Blockchain Mining Simulator
       </h1>
       <p className="text-center text-gray-400 max-w-2xl mx-auto">
-        Click “Start Mining” to earn GRIND tokens and build the blockchain.
+        Mine GRIND tokens by verifying transactions on the blockchain. Each block mined rewards you with coins.
       </p>
 
       {/* 💰 Wallet Balance */}
-      {minerName && (
+      {user ? (
         <div className="text-center bg-emerald-800/10 border border-emerald-500/20 py-3 px-6 rounded-lg w-fit mx-auto">
           <p className="text-emerald-400 font-semibold">
-            🪙 Wallet ({minerName}):{" "}
+            🪙 Wallet ({user.username}):{" "}
             <span className="text-white">{balance.toFixed(2)} GRIND</span>
           </p>
         </div>
+      ) : (
+        <p className="text-center text-yellow-400">
+          ⚠️ Log in or register to start mining blocks.
+        </p>
       )}
 
-      {/* ⛏️ Start Mining Form */}
-      <AddBlockForm onMine={handleMineBlock} mining={mining} />
+      {/* ⛏️ Mine Button */}
+      <div className="flex justify-center">
+        <button
+          onClick={handleMineBlock}
+          disabled={mining || !user}
+          className={`px-6 py-3 rounded-lg font-semibold text-white transition-all ${
+            mining
+              ? "bg-gray-700 cursor-not-allowed"
+              : user
+              ? "bg-emerald-600 hover:bg-emerald-500"
+              : "bg-gray-700 cursor-not-allowed"
+          }`}
+        >
+          {mining ? "⛏️ Mining..." : "Start Mining"}
+        </button>
+      </div>
 
       {/* 🧠 Mining Status */}
       {message && <MiningStatus message={message} />}

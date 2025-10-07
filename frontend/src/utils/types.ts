@@ -21,4 +21,6 @@ export interface BlockchainResponse {
 export interface MiningResponse {
   message: string;   
   block: Block;
+  reward: number;
+  totalSupply: number;
 }

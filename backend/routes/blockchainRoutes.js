@@ -1,26 +1,29 @@
 import express from "express";
 import { Blockchain, Block } from "../utils/blockchain.js";
+import { protect } from "../middleware/authMiddleware.js";
 import BlockModel from "../models/BlockModel.js";
-import WalletModel from "../models/WalletModel.js"; // ✅ new model for miner wallets
+import WalletModel from "../models/WalletModel.js";
+import User from "../models/UserModel.js";
 
 const router = express.Router();
 const blockchain = new Blockchain();
 
-// Base reward (in GrindCoins)
+// 🪙 Base reward per mined block (in GrindCoins)
 const BASE_REWARD = 10;
-let totalSupply = 0; // total GrindCoins in circulation
+let totalSupply = 0; // ⚠️ temporary (better to persist in DB later)
 
-
+// =====================================
+// 🔄 INITIALIZE BLOCKCHAIN FROM MONGODB
+// =====================================
 (async () => {
   try {
     const savedBlocks = await BlockModel.find().sort({ index: 1 });
+
     if (savedBlocks.length > 0) {
       blockchain.chain = savedBlocks.map(
-        (b) =>
-          new Block(b.index, b.timestamp, b.data, b.previousHash)
+        (b) => new Block(b.index, b.timestamp, b.data, b.previousHash)
       );
 
-      // restore hashes + nonces
       blockchain.chain.forEach((block, i) => {
         block.hash = savedBlocks[i].hash;
         block.nonce = savedBlocks[i].nonce;
@@ -32,11 +35,13 @@ let totalSupply = 0; // total GrindCoins in circulation
       console.log("✨ Created Genesis Block in MongoDB");
     }
   } catch (err) {
-    console.error("❌ Failed to load blockchain from MongoDB:", err.message);
+    console.error("❌ Failed to load blockchain:", err.message);
   }
 })();
 
-
+// ======================
+// 📜 GET FULL CHAIN
+// ======================
 router.get("/chain", async (req, res) => {
   try {
     res.json({ chain: blockchain.chain });
@@ -48,10 +53,13 @@ router.get("/chain", async (req, res) => {
   }
 });
 
+// ======================
+// ➕ ADD BLOCK (manual)
+// ======================
 router.post("/addBlock", async (req, res) => {
   try {
     const { data } = req.body;
-    const newBlock = blockchain.addBlock(data);
+    const newBlock = blockchain.addBlock(data || "Manual block added");
     await BlockModel.create(newBlock);
 
     res.json({
@@ -67,51 +75,52 @@ router.post("/addBlock", async (req, res) => {
   }
 });
 
-router.post("/mineBlock", async (req, res) => {
+// ======================
+// ⛏️ MINE BLOCK (AUTH)
+// ======================
+router.post("/mineBlock", protect, async (req, res) => {
   try {
-    const { data, miner } = req.body;
-    if (!miner) {
-      return res.status(400).json({ message: "❌ Miner address is required." });
-    }
-
-    // Simulate grind/airdrop waiting time ⏳
+    const miner = req.user.username || req.user.email;
     const difficulty = blockchain.difficulty;
-    const miningTime =
-      difficulty * 1000 + Math.floor(Math.random() * 2000); // random grind time
+
+    // ⏳ simulate mining delay (grind)
+    const miningTime = difficulty * 1000 + Math.floor(Math.random() * 2000);
     await new Promise((resolve) => setTimeout(resolve, miningTime));
 
-    // Random airdrop bonus 🎁
+    // 💰 calculate reward (base + bonus)
     const bonus = Math.floor(Math.random() * 50);
     const reward = BASE_REWARD + bonus;
 
-    // Mine block
+    // 🧱 mine the block
     const minedBlock = blockchain.minePendingBlock({
       miner,
       reward,
-      message: data || "Mined block",
+      difficulty,
+      message: `Block mined by ${miner} — earned ${reward} GRC`,
     });
 
     await BlockModel.create(minedBlock);
 
-    // Update or create miner wallet 💰
-    await WalletModel.updateOne(
+    // 💼 update wallet (separate collection)
+    const wallet = await WalletModel.findOneAndUpdate(
       { address: miner },
       {
-        $inc: {
-          balance: reward,
-          minedBlocks: 1,
-          totalEarned: reward,
-        },
+        $inc: { balance: reward, minedBlocks: 1, totalEarned: reward },
       },
-      { upsert: true }
+      { upsert: true, new: true }
     );
+
+    // 🔄 update user balance (linked to auth)
+    req.user.balance += reward;
+    await req.user.save();
 
     totalSupply += reward;
 
     res.json({
-      message: `🎉 Block mined successfully by ${miner}! Reward: ${reward} GRC`,
+      message: `🎉 Successfully mined a block! +${reward} GRC`,
       block: minedBlock,
       reward,
+      walletBalance: wallet.balance,
       totalSupply,
     });
   } catch (err) {
@@ -123,7 +132,9 @@ router.post("/mineBlock", async (req, res) => {
   }
 });
 
-
+// ======================
+// 💰 GET ALL WALLETS
+// ======================
 router.get("/wallets", async (req, res) => {
   try {
     const wallets = await WalletModel.find().sort({ balance: -1 });
@@ -136,15 +147,17 @@ router.get("/wallets", async (req, res) => {
   }
 });
 
-
+// ======================
+// ✅ VALIDATE CHAIN
+// ======================
 router.get("/validate", (req, res) => {
   try {
     const isValid = blockchain.isChainValid();
     res.json({
       valid: isValid,
       message: isValid
-        ? "✅ Blockchain is valid"
-        : "⚠️ Blockchain is invalid",
+        ? "✅ Blockchain integrity verified!"
+        : "⚠️ Blockchain is invalid!",
     });
   } catch (err) {
     res.status(500).json({

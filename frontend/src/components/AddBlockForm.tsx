@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React from "react";
+import { useAuth } from "../context/AuthContext";
 
 interface AddBlockFormProps {
   onMine: (miner: string) => void;
@@ -6,11 +7,14 @@ interface AddBlockFormProps {
 }
 
 const AddBlockForm: React.FC<AddBlockFormProps> = ({ onMine, mining }) => {
-  const [miner, setMiner] = useState<string>("");
+  const { user } = useAuth();
 
   const handleMine = () => {
-    if (!miner.trim()) return alert("⚠️ Please enter your miner name first!");
-    onMine(miner);
+    if (!user) {
+      alert("⚠️ Please log in first to start mining!");
+      return;
+    }
+    onMine(user.username);
   };
 
   return (
@@ -19,31 +23,37 @@ const AddBlockForm: React.FC<AddBlockFormProps> = ({ onMine, mining }) => {
         💎 Start Mining Coins
       </h2>
 
-      {/* Miner Name Input */}
-      <input
-        type="text"
-        value={miner}
-        onChange={(e) => setMiner(e.target.value)}
-        placeholder="Enter your miner name (e.g., Gwen)"
-        className="w-full p-3 bg-neutral-800 border border-white/10 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-center"
-      />
+      {/* 🧍 Miner Info */}
+      {user ? (
+        <p className="text-gray-300 mb-3">
+          Logged in as{" "}
+          <span className="text-emerald-400 font-semibold">{user.username}</span>
+        </p>
+      ) : (
+        <p className="text-yellow-400 mb-3 text-sm">
+          ⚠️ Please log in or register to mine coins.
+        </p>
+      )}
 
       {/* Mining Button */}
       <button
         onClick={handleMine}
-        disabled={mining}
-        className={`w-full mt-5 px-5 py-2.5 rounded-lg font-semibold transition-all duration-300 ${
+        disabled={mining || !user}
+        className={`w-full mt-3 px-5 py-2.5 rounded-lg font-semibold transition-all duration-300 ${
           mining
             ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-            : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-md hover:shadow-emerald-500/30"
+            : user
+            ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-md hover:shadow-emerald-500/30"
+            : "bg-gray-800 text-gray-500 cursor-not-allowed"
         }`}
       >
-        {mining ? "⛏️ Mining..." : "🚀 Start Mining"}
+        {mining ? "⛏️ Mining..." : user ? "🚀 Start Mining" : "🔒 Login Required"}
       </button>
 
       {/* Optional Hint */}
       <p className="text-gray-500 text-sm mt-3">
-        Each successful mine earns you <span className="text-emerald-400 font-semibold">GRIND</span> tokens!
+        Each successful mine rewards{" "}
+        <span className="text-emerald-400 font-semibold">GRC tokens</span> 💰
       </p>
     </div>
   );

@@ -1,6 +1,7 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import { FiRefreshCw } from "react-icons/fi";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { FiRefreshCw, FiLogOut } from "react-icons/fi";
+import { useAuth } from "../context/AuthContext";
 
 interface NavbarProps {
   onRefresh?: () => void;
@@ -8,6 +9,13 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ onRefresh }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-neutral-900/80 backdrop-blur-md border-b border-emerald-500/20 shadow-sm">
@@ -44,7 +52,7 @@ const Navbar: React.FC<NavbarProps> = ({ onRefresh }) => {
             About
           </Link>
 
-          {/* 🔄 Refresh Button (optional) */}
+          {/* 🔄 Refresh Button */}
           {onRefresh && (
             <button
               onClick={onRefresh}
@@ -53,6 +61,47 @@ const Navbar: React.FC<NavbarProps> = ({ onRefresh }) => {
             >
               <FiRefreshCw className="text-emerald-400 text-lg" />
             </button>
+          )}
+
+          {/* 👤 Auth Links */}
+          {!user ? (
+            <>
+              <Link
+                to="/login"
+                className={`${
+                  location.pathname === "/login"
+                    ? "text-emerald-400 font-medium"
+                    : "text-gray-400 hover:text-gray-200"
+                } transition-colors`}
+              >
+                Login
+              </Link>
+              <Link
+                to="/register"
+                className={`${
+                  location.pathname === "/register"
+                    ? "text-emerald-400 font-medium"
+                    : "text-gray-400 hover:text-gray-200"
+                } transition-colors`}
+              >
+                Register
+              </Link>
+            </>
+          ) : (
+            <div className="flex items-center gap-4 text-sm">
+              <p className="text-emerald-400 font-medium">
+                👋 {user.username}
+              </p>
+              <span className="text-gray-400">
+                💰 {user.balance.toFixed(2)} GRC
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 px-3 py-1.5 text-gray-300 hover:text-red-400 border border-white/10 hover:border-red-500/30 rounded-lg transition-colors"
+              >
+                <FiLogOut className="text-sm" /> Logout
+              </button>
+            </div>
           )}
         </div>
       </div>
